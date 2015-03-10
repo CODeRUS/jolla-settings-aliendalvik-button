@@ -1,0 +1,24 @@
+{
+    "translation_catalog": "settings-system",
+    "entries": [
+        {
+            "path": "system_settings/info/aliendalvik",
+            "title": "Aliendalvik",
+            "translation_id": "settings_system-aliendalvik",
+            "type": "page",
+            "icon": "image://theme/icon-m-aliendalvik",
+            "order": 200,
+            "params": {
+                "source": "/usr/share/jolla-settings/pages/aliendalvik/mainpage.qml"
+            }
+        },
+        {
+            "path": "system_settings/info/aliendalvik/aliendalvik_active",
+            "type": "custom",
+            "params": {
+                "source": "/usr/share/jolla-settings/pages/aliendalvik/EnableSwitch.qml",
+                "type": "grid"
+            }
+        }
+    ]
+}

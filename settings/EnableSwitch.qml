@@ -1,74 +1,149 @@
 import QtQuick 2.1
 import Sailfish.Silica 1.0
-import org.nemomobile.dbusnext 2.0
-import Mer.Cutes 1.1
+import org.nemomobile.dbus 2.0
+import com.jolla.apkd 1.0
 
 Switch {
-    id: dalvikSwitch
-
+    id: root
     property string entryPath
-    property string activeState
-    onActiveStateChanged: {
-        dalvikSwitch.busy = false
-    }
 
-    CutesActor {
-        id: tools
-        source: "./tools.js"
+    property bool alienDalvikRunning
+    property bool alienDalvikAutostart
+    property bool ready
+
+    DBusInterface {
+        id: apkInterface
+
+        bus: DBus.SystemBus
+        service: "com.jolla.apkd"
+        path: "/com/jolla/apkd"
+        iface: "com.jolla.apkd"
+
+        Component.onCompleted: {
+            apkInterface.typedCall("isRunning", [],
+                                   function(isRunning) {
+                                       root.ready = true
+                                       root.alienDalvikRunning = isRunning
+                                   },
+                                   function() {
+                                       console.log("Error getting android state")
+                                   })
+        }
     }
 
     DBusInterface {
-        id: systemdPropertiesIface
-        service: 'org.freedesktop.systemd1'
-        path: '/org/freedesktop/systemd1/unit/aliendalvik_2eservice'
-        iface: 'org.freedesktop.systemd1.Unit'
-        bus: DBus.SystemBus
-    }
+        id: dalvikService
 
-    DBusInterface {
-        id: systemdSignalIface
-        service: 'org.freedesktop.systemd1'
-        path: '/org/freedesktop/systemd1/unit/aliendalvik_2eservice'
-        iface: 'org.freedesktop.DBus.Properties'
         bus: DBus.SystemBus
-
+        service: "org.freedesktop.systemd1"
+        iface: "org.freedesktop.systemd1.Unit"
         signalsEnabled: true
 
-        signal rcPropertiesChanged(string interfaceName, variant changedProperties, variant invalidatedProperties)
-        onRcPropertiesChanged: {
-            if (interfaceName == "org.freedesktop.systemd1.Unit") {
-                activeState = systemdPropertiesIface.getProperty("ActiveState")
+        function updateProperties() {
+            if (path !== "") {
+                var activeState = dalvikService.getProperty("ActiveState")
+                if (activeState === "active" || activeState === "inactive") {
+                    root.busy = false
+                }
+                else {
+                    root.busy = true
+                }
+                root.alienDalvikRunning = activeState === "active"
+            } else {
+                root.alienDalvikRunning = false
             }
         }
 
+        onPropertiesChanged: runningUpdateTimer.start()
+        onPathChanged: updateProperties()
+    }
+
+    DBusInterface {
+        id: manager
+
+        bus: DBus.SystemBus
+        service: "org.freedesktop.systemd1"
+        path: "/org/freedesktop/systemd1"
+        iface: "org.freedesktop.systemd1.Manager"
+        signalsEnabled: true
+
+        signal unitNew(string name)
+        onUnitNew: {
+            if (name == "aliendalvik.service") {
+                pathUpdateTimer.start()
+            }
+        }
+
+        signal unitRemoved(string name)
+        onUnitRemoved: {
+            if (name == "aliendalvik.service") {
+                dalvikService.path = ""
+                pathUpdateTimer.stop()
+            }
+        }
+
+        signal unitFilesChanged()
+        onUnitFilesChanged: {
+            updateAutostart()
+        }
+
         Component.onCompleted: {
-            activeState = systemdPropertiesIface.getProperty("ActiveState")
+            updatePath()
+            updateAutostart()
+        }
+
+        function updateAutostart() {
+            manager.typedCall("GetUnitFileState", [{"type": "s", "value": "aliendalvik.service"}],
+                              function(state) {
+                                  if (state !== "disabled" && state !== "invalid") {
+                                      root.alienDalvikAutostart = true
+                                  } else {
+                                      root.alienDalvikAutostart = false
+                                  }
+                              },
+                              function() {
+                                  root.alienDalvikAutostart = false
+                              })
+        }
+
+        function updatePath() {
+            manager.typedCall("GetUnit", [{ "type": "s", "value": "aliendalvik.service"}], function(unit) {
+                dalvikService.path = unit
+            }, function() {
+                dalvikService.path = ""
+            })
         }
     }
 
-    icon.source: "image://theme/icon-m-aliendalvik"
-    checked: activeState == "active"
+    Timer {
+        // starting and stopping can result in lots of property changes
+        id: runningUpdateTimer
+        interval: 100
+        onTriggered: dalvikService.updateProperties()
+    }
+
+    Timer {
+        // stopping service can result in unit appearing and disappering, for some reason.
+        id: pathUpdateTimer
+        interval: 100
+        onTriggered: manager.updatePath()
+    }
+
+    icon.source: "image://theme/icon-m-android"
+    enabled: root.ready
+    checked: root.alienDalvikRunning
     automaticCheck: false
     onClicked: {
-        if (dalvikSwitch.busy) {
+        if (root.busy) {
             return
         }
-        var on_reply = function() {
-        };
-        var on_error = function(err) {
-            console.log("error:", err);
-        };
+
         if (checked) {
-            tools.request("stopAlien", {}, {
-                on_reply: on_reply, on_error: on_error
-            });
+            apkInterface.typedCall("controlService", [{ "type": "b", "value": false }])
         }
         else {
-            tools.request("restartAlien", {}, {
-                on_reply: on_reply, on_error: on_error
-            });
+            apkInterface.typedCall("controlService", [{ "type": "b", "value": true }])
         }
-        dalvikSwitch.busy = true
     }
 
     Behavior on opacity { FadeAnimation { } }

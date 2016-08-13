@@ -4,9 +4,8 @@
         {
             "path": "system_settings/info/aliendalvik",
             "title": "Aliendalvik",
-            "translation_id": "settings_system-aliendalvik",
             "type": "page",
-            "icon": "image://theme/icon-m-aliendalvik",
+            "icon": "image://theme/icon-m-android",
             "order": 200,
             "params": {
                 "source": "/usr/share/jolla-settings/pages/aliendalvik/mainpage.qml"
@@ -14,7 +13,9 @@
         },
         {
             "path": "system_settings/info/aliendalvik/aliendalvik_active",
+            "title": "Android™ Support",
             "type": "custom",
+            "icon": "image://theme/icon-m-android",
             "params": {
                 "source": "/usr/share/jolla-settings/pages/aliendalvik/EnableSwitch.qml",
                 "type": "grid"

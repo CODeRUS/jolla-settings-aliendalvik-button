@@ -2,8 +2,10 @@ import QtQuick 2.1
 import Sailfish.Silica 1.0
 import org.nemomobile.dbus 2.0
 import com.jolla.apkd 1.0
+import com.jolla.settings 1.0
+import com.jolla.settings.system 1.0
 
-Switch {
+SettingsToggle {
     id: root
     property string entryPath
 
@@ -129,11 +131,11 @@ Switch {
         onTriggered: manager.updatePath()
     }
 
+    name: qsTr("Aliendalvik")
     icon.source: "image://theme/icon-m-android"
-    enabled: root.ready
+    available: root.ready
     checked: root.alienDalvikRunning
-    automaticCheck: false
-    onClicked: {
+    onToggled: {
         if (root.busy) {
             return
         }
@@ -145,6 +147,4 @@ Switch {
             apkInterface.typedCall("controlService", [{ "type": "b", "value": true }])
         }
     }
-
-    Behavior on opacity { FadeAnimation { } }
 }
